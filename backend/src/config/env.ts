@@ -43,6 +43,8 @@ export const env = {
   // Prisma reads DATABASE_URL by itself; we check it here to fail early with a clear message.
   databaseUrl: requireEnv('DATABASE_URL'),
   sessionTtlDays: positiveNumber('SESSION_TTL_DAYS', 7),
+  // A session is dropped after this many hours without any request.
+  sessionIdleHours: positiveNumber('SESSION_IDLE_HOURS', 24),
   // undefined keeps Express's default (proxy headers like X-Forwarded-For are ignored).
   trustProxy: trustProxyEnv('TRUST_PROXY'),
 };

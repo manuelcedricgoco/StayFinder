@@ -28,6 +28,11 @@ export async function createSession(
   return { token, expiresAt };
 }
 
+// Sessions die when they are not used for this long, even if they have not
+// expired yet. Checked on every use and enforced for all sessions by the
+// background cleanup in index.ts.
+const IDLE_LIMIT_MS = env.sessionIdleHours * 60 * 60 * 1000;
+
 export async function findUserBySessionToken(token: string): Promise<PublicUser | null> {
   const session = await prisma.session.findUnique({
     where: { tokenHash: hashSessionToken(token) },
@@ -39,6 +44,12 @@ export async function findUserBySessionToken(token: string): Promise<PublicUser 
     await prisma.session.deleteMany({ where: { id: session.id } });
     return null;
   }
+  // Idle sessions must be dropped BEFORE the activity update below, or the
+  // refresh would keep them alive forever.
+  if (session.lastActivityAt.getTime() <= Date.now() - IDLE_LIMIT_MS) {
+    await prisma.session.deleteMany({ where: { id: session.id } });
+    return null;
+  }
   const activityCutoff = new Date(Date.now() - 60_000);
   if (session.lastActivityAt < activityCutoff) {
     await prisma.session.updateMany({
@@ -47,6 +58,21 @@ export async function findUserBySessionToken(token: string): Promise<PublicUser 
     });
   }
   return session.user;
+}
+
+// Deletes sessions that expired or idled out (not used since the cutoff).
+// Returns how many rows were removed. Runs at server start and every hour
+// from index.ts so unused sessions do not pile up in the database.
+export async function deleteStaleSessions(now = new Date()): Promise<number> {
+  const result = await prisma.session.deleteMany({
+    where: {
+      OR: [
+        { expiresAt: { lte: now } },
+        { lastActivityAt: { lte: new Date(now.getTime() - IDLE_LIMIT_MS) } },
+      ],
+    },
+  });
+  return result.count;
 }
 
 export async function deleteSession(token: string): Promise<void> {

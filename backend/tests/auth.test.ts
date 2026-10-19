@@ -49,6 +49,7 @@ describe('Phase 3 authentication', () => {
   let baseUrl = '';
   let prisma: typeof import('../src/lib/prisma').prisma;
   let hashPassword: typeof import('../src/lib/password').hashPassword;
+  let deleteStaleSessions: typeof import('../src/services/session.service').deleteStaleSessions;
 
   const owner = { name: 'Olivia Owner', email: 'owner@example.com', password: 'Passw0rd123', role: 'OWNER' };
   const boarder = { name: 'Ben Boarder', email: 'boarder@example.com', password: 'Passw0rd123', role: 'BOARDER' };
@@ -74,6 +75,7 @@ describe('Phase 3 authentication', () => {
     // Import AFTER DATABASE_URL is set so the app and Prisma use the test database.
     ({ prisma } = await import('../src/lib/prisma'));
     ({ hashPassword } = await import('../src/lib/password'));
+    ({ deleteStaleSessions } = await import('../src/services/session.service'));
     const { createApp } = await import('../src/app');
 
     server = createApp().listen(0);
@@ -235,6 +237,63 @@ describe('Phase 3 authentication', () => {
       await client.request('POST', '/api/auth/login', { email: owner.email, password: owner.password });
       await prisma.session.updateMany({ data: { expiresAt: new Date(Date.now() - 1000) } });
       assert.equal((await client.request('GET', '/api/auth/me')).status, 401);
+    });
+
+    it('rejects a session idle for more than the limit and removes it from the database', async () => {
+      const client = newClient();
+      const login = await client.request('POST', '/api/auth/login', { email: owner.email, password: owner.password });
+      assert.equal(login.status, 200);
+      const session = await prisma.session.findFirstOrThrow({
+        where: { user: { email: owner.email } },
+        orderBy: { createdAt: 'desc' },
+      });
+
+      // The 24-hour idle limit leaves this session untouched...
+      await prisma.session.updateMany({ data: { lastActivityAt: new Date(Date.now() - 25 * 60 * 60 * 1000) } });
+
+      assert.equal((await client.request('GET', '/api/auth/me')).status, 401);
+      assert.equal(await prisma.session.findUnique({ where: { id: session.id } }), null);
+    });
+
+    it('keeps serving an active session', async () => {
+      const client = newClient();
+      const login = await client.request('POST', '/api/auth/login', { email: owner.email, password: owner.password });
+      assert.equal(login.status, 200);
+      const me = await client.request('GET', '/api/auth/me');
+      assert.equal(me.status, 200);
+      assert.equal(me.data?.user.email, owner.email);
+    });
+
+    it('cleanup deletes expired and idle sessions and keeps valid ones', async () => {
+      const user = await prisma.user.findUniqueOrThrow({ where: { email: owner.email } });
+      const now = Date.now();
+      const [expired, idle, valid] = await prisma.$transaction([
+        prisma.session.create({
+          data: { tokenHash: 'cleanup-expired-hash', userId: user.id, expiresAt: new Date(now - 1000), lastActivityAt: new Date(now) },
+        }),
+        prisma.session.create({
+          data: {
+            tokenHash: 'cleanup-idle-hash',
+            userId: user.id,
+            expiresAt: new Date(now + 24 * 60 * 60 * 1000),
+            lastActivityAt: new Date(now - 25 * 60 * 60 * 1000),
+          },
+        }),
+        prisma.session.create({
+          data: {
+            tokenHash: 'cleanup-valid-hash',
+            userId: user.id,
+            expiresAt: new Date(now + 24 * 60 * 60 * 1000),
+            lastActivityAt: new Date(now),
+          },
+        }),
+      ]);
+
+      const removed = await deleteStaleSessions(new Date(now));
+      assert.ok(removed >= 2);
+      assert.equal(await prisma.session.findUnique({ where: { id: expired.id } }), null);
+      assert.equal(await prisma.session.findUnique({ where: { id: idle.id } }), null);
+      assert.ok(await prisma.session.findUnique({ where: { id: valid.id } }));
     });
   });
 
