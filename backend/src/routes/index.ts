@@ -1,7 +1,6 @@
 import { Router } from 'express';
 import { adminPropertyRouter } from './adminProperty.routes';
 import { adminRouter } from './admin.routes';
-import { areaRouter } from './area.routes';
 import { authRouter } from './auth.routes';
 import { boarderRouter } from './boarder.routes';
 import { healthRouter } from './health.routes';
@@ -21,11 +20,10 @@ apiRouter.use('/auth', authRouter);
 apiRouter.use('/settings', settingsRouter);
 apiRouter.use(referenceRouter); // /api/locations, /api/amenities
 apiRouter.use('/properties', publicPropertyRouter);
+apiRouter.use('/admin/properties', adminPropertyRouter);
+apiRouter.use('/admin', adminRouter);
 apiRouter.use('/owner/properties', ownerPropertyRouter);
 apiRouter.use('/owner', ownerRouter);
-apiRouter.use('/admin', adminRouter);
-apiRouter.use('/admin/properties', adminPropertyRouter);
 apiRouter.use('/boarder', boarderRouter);
-apiRouter.use(areaRouter); // /api/admin, /api/owner, /api/boarder
 
 // Future phases mount their routers here.

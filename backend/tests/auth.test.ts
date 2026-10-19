@@ -219,7 +219,7 @@ describe('Phase 3 authentication', () => {
   describe('protected routes', () => {
     it('rejects requests without a session', async () => {
       const client = newClient();
-      for (const url of ['/api/auth/me', '/api/admin', '/api/owner', '/api/boarder']) {
+      for (const url of ['/api/auth/me', '/api/admin', '/api/owner/dashboard', '/api/boarder/favorites']) {
         assert.equal((await client.request('GET', url)).status, 401, url);
       }
     });
@@ -307,23 +307,23 @@ describe('Phase 3 authentication', () => {
 
     it('lets a boarder into /boarder only', async () => {
       const client = await loggedIn(boarder.email, boarder.password);
-      assert.equal((await client.request('GET', '/api/boarder')).status, 200);
-      assert.equal((await client.request('GET', '/api/owner')).status, 403);
+      assert.equal((await client.request('GET', '/api/boarder/favorites')).status, 200);
+      assert.equal((await client.request('GET', '/api/owner/dashboard')).status, 403);
       assert.equal((await client.request('GET', '/api/admin')).status, 403);
     });
 
     it('lets an owner into /owner only', async () => {
       const client = await loggedIn(owner.email, owner.password);
-      assert.equal((await client.request('GET', '/api/owner')).status, 200);
-      assert.equal((await client.request('GET', '/api/boarder')).status, 403);
+      assert.equal((await client.request('GET', '/api/owner/dashboard')).status, 200);
+      assert.equal((await client.request('GET', '/api/boarder/favorites')).status, 403);
       assert.equal((await client.request('GET', '/api/admin')).status, 403);
     });
 
     it('lets an admin into /admin only', async () => {
       const client = await loggedIn(admin.email, admin.password);
       assert.equal((await client.request('GET', '/api/admin')).status, 200);
-      assert.equal((await client.request('GET', '/api/owner')).status, 403);
-      assert.equal((await client.request('GET', '/api/boarder')).status, 403);
+      assert.equal((await client.request('GET', '/api/owner/dashboard')).status, 403);
+      assert.equal((await client.request('GET', '/api/boarder/favorites')).status, 403);
     });
   });
 
