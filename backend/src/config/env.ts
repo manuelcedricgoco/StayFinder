@@ -25,10 +25,11 @@ function positiveNumber(name: string, fallback: number): number {
 }
 
 // Accepts "true" (trust all proxies), a hop count, or comma-separated proxied addresses.
-function trustProxyEnv(name: string): boolean | string | undefined {
+function trustProxyEnv(name: string): boolean | number | string | undefined {
   const value = optionalEnv(name);
   if (value === undefined) return undefined;
   if (value.toLowerCase() === 'true') return true;
+  if (/^\d+$/.test(value)) return Number(value);
   return value;
 }
 
