@@ -4,6 +4,7 @@ import { Router, type Request } from 'express';
 import { env, oauthConfig } from '../config/env';
 import { prisma } from '../lib/prisma';
 import { publicUserSelect } from '../lib/publicUser';
+import { oauthLimiter } from '../middleware/rateLimit';
 import { setSessionCookie } from '../lib/sessionCookie';
 import { getPlatformSettings } from '../services/platformSettings.service';
 import { createSession } from '../services/session.service';
@@ -240,6 +241,8 @@ async function findOrCreateOAuthUser(
 }
 
 export const oauthRouter = Router();
+
+oauthRouter.use(oauthLimiter);
 
 // GET /api/auth/oauth/providers - lets the frontend know what is available
 oauthRouter.get('/providers', (_req, res) => {

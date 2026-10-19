@@ -6,10 +6,11 @@ import { prisma } from '../lib/prisma';
 import { publicUserSelect, toPublicUser } from '../lib/publicUser';
 import { clearSessionCookie, readSessionToken, setSessionCookie } from '../lib/sessionCookie';
 import { requireAuth } from '../middleware/auth';
+import { authLimiter } from '../middleware/rateLimit';
 import { validateBody } from '../middleware/validate';
 import { createSession, deleteSession, findUserBySessionToken } from '../services/session.service';
 import { getPlatformSettings } from '../services/platformSettings.service';
-import { recordSecurityEvent, requestSecurityContext } from '../services/security.service';
+import { isLoginThrottled, recordSecurityEvent, requestSecurityContext } from '../services/security.service';
 import {
   loginSchema,
   registerSchema,
@@ -23,6 +24,7 @@ export const authRouter = Router();
 // POST /api/auth/register - create an OWNER or BOARDER account and log them in
 authRouter.post(
   '/register',
+  authLimiter,
   validateBody(registerSchema),
   asyncHandler(async (req, res) => {
     const { name, email, password, role } = req.body as RegisterInput;
@@ -80,9 +82,20 @@ authRouter.post(
 // POST /api/auth/login
 authRouter.post(
   '/login',
+  authLimiter,
   validateBody(loginSchema),
   asyncHandler(async (req, res) => {
     const { email, password } = req.body as LoginInput;
+
+    // Per-account brute-force protection: stop before any scrypt work. The
+    // message stays generic so it leaks nothing about which emails are real.
+    if (await isLoginThrottled(email)) {
+      res.status(429).json({
+        status: 'error',
+        message: 'Too many failed login attempts. Please try again later.',
+      });
+      return;
+    }
 
     const record = await prisma.user.findUnique({
       where: { email },

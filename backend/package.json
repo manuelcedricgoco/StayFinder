@@ -12,7 +12,7 @@
     "build": "tsc -p tsconfig.build.json",
     "start": "node dist/index.js",
     "typecheck": "tsc --noEmit",
-    "test": "tsx --test tests/auth.test.ts tests/oauth.test.ts tests/properties.test.ts",
+    "test": "tsx --test tests/auth.test.ts tests/oauth.test.ts tests/properties.test.ts tests/rateLimit.test.ts",
     "db:seed": "tsx prisma/seed.ts",
     "prisma:generate": "prisma generate",
     "prisma:migrate": "prisma migrate dev",
@@ -23,6 +23,7 @@
     "cors": "^2.8.5",
     "dotenv": "^16.4.5",
     "express": "^4.21.0",
+    "express-rate-limit": "^8.7.1",
     "multer": "^2.4.0",
     "zod": "^3.24.0"
   },

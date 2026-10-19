@@ -37,6 +37,24 @@ export async function recordSecurityEvent(input: SecurityEventInput): Promise<vo
   });
 }
 
+// Per-account brute-force protection: after this many LOGIN_FAILED events for
+// one email address within the window, logins for that account are refused
+// before any password hashing work is done.
+export const LOGIN_THROTTLE_MAX_FAILED_ATTEMPTS = 5;
+export const LOGIN_THROTTLE_WINDOW_MS = 15 * 60 * 1000;
+
+export async function isLoginThrottled(email: string): Promise<boolean> {
+  const failedAttempts = await prisma.securityEvent.count({
+    where: {
+      action: 'LOGIN_FAILED',
+      status: 'FAILED',
+      email: { equals: email },
+      createdAt: { gte: new Date(Date.now() - LOGIN_THROTTLE_WINDOW_MS) },
+    },
+  });
+  return failedAttempts >= LOGIN_THROTTLE_MAX_FAILED_ATTEMPTS;
+}
+
 export function actorSecurityEvent(
   req: Request,
   action: string,

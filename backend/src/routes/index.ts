@@ -5,6 +5,7 @@ import { areaRouter } from './area.routes';
 import { authRouter } from './auth.routes';
 import { boarderRouter } from './boarder.routes';
 import { healthRouter } from './health.routes';
+import { apiLimiter } from '../middleware/rateLimit';
 import { ownerPropertyRouter } from './ownerProperty.routes';
 import { ownerRouter } from './owner.routes';
 import { publicPropertyRouter } from './publicProperty.routes';
@@ -12,6 +13,8 @@ import { referenceRouter } from './reference.routes';
 import { settingsRouter } from './settings.routes';
 
 export const apiRouter = Router();
+
+apiRouter.use(apiLimiter);
 
 apiRouter.use('/health', healthRouter);
 apiRouter.use('/auth', authRouter);
