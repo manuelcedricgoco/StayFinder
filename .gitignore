@@ -1,0 +1,35 @@
+# Dependencies
+node_modules/
+
+# Build output
+dist/
+build/
+*.tsbuildinfo
+
+# Environment files (real secrets live here - never commit them)
+.env
+.env.*
+!.env.example
+
+# SQLite database files (local data only; migrations ARE committed)
+*.db
+*.db-journal
+*.sqlite
+*.sqlite3
+backend/uploads/
+
+# Logs
+*.log
+npm-debug.log*
+
+# Editor / OS
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/*
+!.vscode/extensions.json
+
+# Test coverage
+coverage/
+
+.generated-boarder/

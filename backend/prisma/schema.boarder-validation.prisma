@@ -1,0 +1,445 @@
+// Prisma schema - https://pris.ly/d/prisma-schema
+// Phase 1: SystemCheck placeholder (used by the health check).
+// Phase 3: User, Session, OAuthAccount + Role enum for authentication.
+// Phase 4: Property, PropertyImage, Room, Amenity, Location for owner listings.
+// Phase 7: Favorite, Inquiry, Review, Report for boarder features.
+
+generator client {
+  provider = "prisma-client-js"
+  output = "../.generated-boarder"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+enum PropertyType {
+  BOARDING_HOUSE
+  APARTMENT
+  ROOM
+  BEDSPACE
+}
+
+// PENDING = waiting for admin review, APPROVED = published,
+// REJECTED = admin said no (see rejectionReason), INACTIVE = hidden.
+enum PropertyStatus {
+  PENDING
+  APPROVED
+  REJECTED
+  INACTIVE
+}
+
+enum Availability {
+  AVAILABLE
+  FULLY_OCCUPIED
+  COMING_SOON
+}
+
+enum Role {
+  ADMIN
+  OWNER
+  BOARDER
+}
+
+enum InquiryStatus {
+  PENDING
+  RESPONDED
+  CLOSED
+}
+
+enum PaymentMethod {
+  CASH
+  GCASH
+  MAYA
+  BANK_TRANSFER
+  OTHER
+}
+
+enum PaymentStatus {
+  PAID
+}
+
+enum ReviewStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
+enum ReportReason {
+  FAKE_PROPERTY
+  SCAM
+  INCORRECT_INFORMATION
+  INAPPROPRIATE_CONTENT
+  PROPERTY_UNAVAILABLE
+  OTHER
+}
+
+enum ReportStatus {
+  PENDING
+  RESOLVED
+  REJECTED
+}
+
+enum OwnerVerificationStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
+model User {
+  id                String             @id @default(cuid())
+  name              String
+  email             String             @unique // always stored lowercase
+  passwordHash      String? // null for accounts created through Google/Facebook only
+  role              Role               @default(BOARDER)
+  avatarUrl         String?
+  phoneNumber       String?
+  createdAt         DateTime           @default(now())
+  updatedAt         DateTime           @updatedAt
+  sessions          Session[]
+  oauthAccounts     OAuthAccount[]
+  properties        Property[]
+  favorites         Favorite[]
+  inquiriesSent     Inquiry[]          @relation("InquirySender")
+  inquiriesReceived Inquiry[]          @relation("InquiryOwner")
+  reviews           Review[]
+  reports           Report[]
+  ownerVerification OwnerVerification?
+  securityEvents    SecurityEvent[]
+  ownerPreferences  OwnerPreferences?
+  boarderPreferences BoarderPreferences?
+
+  @@map("users")
+}
+
+// Server-side login sessions. Only a SHA-256 hash of the cookie token is stored.
+model Session {
+  id             String   @id @default(cuid())
+  tokenHash      String   @unique
+  userId          String
+  user            User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  ipAddress       String?
+  userAgent       String?
+  lastActivityAt  DateTime @default(now())
+  expiresAt       DateTime
+  createdAt       DateTime @default(now())
+
+  @@index([userId])
+  @@map("sessions")
+}
+
+// Append-oriented security history. Credential material is never stored here.
+model SecurityEvent {
+  id         String   @id @default(cuid())
+  userId     String?
+  user       User?    @relation(fields: [userId], references: [id], onDelete: SetNull)
+  userName   String?
+  email      String?
+  role       String?
+  action     String
+  target     String?
+  ipAddress  String?
+  userAgent  String?
+  status     String
+  createdAt  DateTime @default(now())
+
+  @@index([createdAt])
+  @@index([action, createdAt])
+  @@index([userId, createdAt])
+  @@index([ipAddress, createdAt])
+  @@map("security_events")
+}
+
+// Provider identity linked to a local user account.
+model OAuthAccount {
+  id                String   @id @default(cuid())
+  provider          String // "google" | "facebook"
+  providerAccountId String
+  userId            String
+  user              User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  createdAt         DateTime @default(now())
+
+  @@unique([provider, providerAccountId])
+  @@index([userId])
+  @@map("oauth_accounts")
+}
+
+model SystemCheck {
+  id        Int      @id @default(autoincrement())
+  note      String   @default("phase-1-setup")
+  createdAt DateTime @default(now())
+
+  @@map("system_checks")
+}
+
+model PlatformSettings {
+  id                   String   @id @default("global")
+  siteName             String   @default("StayFinder")
+  allowRegistrations   Boolean  @default(true)
+  autoApproveListings  Boolean  @default(false)
+  updatedAt            DateTime @updatedAt
+
+  @@map("platform_settings")
+}
+
+// ---------------------------------------------------------------------------
+// Phase 4: property listings
+// ---------------------------------------------------------------------------
+
+// Reference table: the municipalities of Occidental Mindoro (filled by `npm run db:seed`).
+model Location {
+  id         String     @id @default(cuid())
+  name       String     @unique
+  province   String     @default("Occidental Mindoro")
+  latitude   Float? // municipality centre, reserved for the future map
+  longitude  Float?
+  properties Property[]
+  boarderPreferences BoarderPreferences[]
+
+  @@map("locations")
+}
+
+// Reference table: things a property can offer (filled by `npm run db:seed`).
+model Amenity {
+  id         String     @id @default(cuid())
+  slug       String     @unique
+  name       String     @unique
+  properties Property[] // many-to-many (Prisma creates the join table)
+  boarderPreferenceAmenities BoarderPreferenceAmenity[]
+
+  @@map("amenities")
+}
+
+model Property {
+  id              String          @id @default(cuid())
+  ownerId         String
+  owner           User            @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  name            String
+  description     String
+  propertyType    PropertyType
+  monthlyPrice    Int // whole pesos
+  availability    Availability    @default(AVAILABLE)
+  availableRooms  Int             @default(1)
+  address         String
+  locationId      String
+  location        Location        @relation(fields: [locationId], references: [id], onDelete: Restrict)
+  latitude        Float? // optional, reserved for the future map
+  longitude       Float?
+  status          PropertyStatus  @default(PENDING)
+  rejectionReason String?
+  createdAt       DateTime        @default(now())
+  updatedAt       DateTime        @updatedAt
+  images          PropertyImage[]
+  rooms           Room[]
+  amenities       Amenity[]
+  favorites       Favorite[]
+  inquiries       Inquiry[]
+  reviews         Review[]
+  reports         Report[]
+  paymentRecords  PaymentRecord[]
+  defaultForOwnerPreferences OwnerPreferences[] @relation("OwnerDefaultProperty")
+
+  @@index([ownerId])
+  @@index([status])
+  @@index([locationId])
+  @@map("properties")
+}
+
+model PropertyImage {
+  id         String   @id @default(cuid())
+  propertyId String
+  property   Property @relation(fields: [propertyId], references: [id], onDelete: Cascade)
+  url        String
+  publicId   String? // Cloudinary id, used when real uploads are added
+  isPrimary  Boolean  @default(false)
+  sortOrder  Int      @default(0)
+  createdAt  DateTime @default(now())
+
+  @@index([propertyId])
+  @@map("property_images")
+}
+
+// Individual rooms/units inside a property. Prepared for later phases:
+// no API or screen uses it yet (the form's "available rooms" is a count on Property).
+model Room {
+  id           String   @id @default(cuid())
+  propertyId   String
+  property     Property @relation(fields: [propertyId], references: [id], onDelete: Cascade)
+  name         String
+  monthlyPrice Int? // optional override of the property price
+  capacity     Int      @default(1)
+  isAvailable  Boolean  @default(true)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+  paymentRecords PaymentRecord[]
+
+  @@index([propertyId])
+  @@map("rooms")
+}
+
+// Owner-entered rent records; this is a ledger, not a payment processor.
+model PaymentRecord {
+  id              String        @id @default(cuid())
+  propertyId      String
+  property        Property      @relation(fields: [propertyId], references: [id], onDelete: Restrict)
+  roomId          String?
+  room            Room?         @relation(fields: [roomId], references: [id], onDelete: SetNull)
+  boarderName     String
+  amount          Int
+  paymentDate     DateTime
+  paymentMethod   PaymentMethod
+  status          PaymentStatus @default(PAID)
+  referenceNumber String?
+  notes           String?
+  createdAt       DateTime      @default(now())
+
+  @@index([propertyId, paymentDate])
+  @@index([propertyId, status])
+  @@index([roomId])
+  @@map("payment_records")
+}
+
+model OwnerPreferences {
+  id                    String                 @id @default(cuid())
+  ownerId               String                 @unique
+  owner                 User                   @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  defaultPropertyId     String?
+  defaultProperty       Property?              @relation("OwnerDefaultProperty", fields: [defaultPropertyId], references: [id], onDelete: SetNull)
+  notifyNewInquiry      Boolean                @default(true)
+  notifyNewReview       Boolean                @default(true)
+  notifyListingStatus   Boolean                @default(true)
+  notifyVerification    Boolean                @default(true)
+  notifyPayment         Boolean                @default(true)
+  notifyAnnouncements   Boolean                @default(true)
+  emailNotifications    Boolean                @default(true)
+  inAppNotifications    Boolean                @default(true)
+  createdAt             DateTime               @default(now())
+  updatedAt             DateTime               @updatedAt
+
+  @@index([defaultPropertyId])
+  @@map("owner_preferences")
+}
+
+model BoarderPreferences {
+  id                    String                     @id @default(cuid())
+  boarderId             String                     @unique
+  boarder               User                       @relation(fields: [boarderId], references: [id], onDelete: Cascade)
+  preferredLocationId   String?
+  preferredLocation     Location?                  @relation(fields: [preferredLocationId], references: [id], onDelete: SetNull)
+  minBudget             Int?
+  maxBudget             Int?
+  propertyType          PropertyType?
+  occupants             Int?
+  notifyInquiryReplies  Boolean                    @default(true)
+  notifyFavoriteUpdates Boolean                    @default(true)
+  notifyListingUpdates  Boolean                    @default(true)
+  notifyReviewUpdates   Boolean                    @default(true)
+  notifyAnnouncements   Boolean                    @default(true)
+  emailNotifications    Boolean                    @default(true)
+  inAppNotifications    Boolean                    @default(true)
+  preferredAmenities   BoarderPreferenceAmenity[]
+  createdAt             DateTime                   @default(now())
+  updatedAt             DateTime                   @updatedAt
+
+  @@index([preferredLocationId])
+  @@map("boarder_preferences")
+}
+
+model BoarderPreferenceAmenity {
+  boarderPreferencesId String
+  amenityId            String
+  boarderPreferences   BoarderPreferences @relation(fields: [boarderPreferencesId], references: [id], onDelete: Cascade)
+  amenity              Amenity            @relation(fields: [amenityId], references: [id], onDelete: Cascade)
+
+  @@id([boarderPreferencesId, amenityId])
+  @@index([amenityId])
+  @@map("boarder_preference_amenities")
+}
+
+model Favorite {
+  id         String   @id @default(cuid())
+  boarderId  String
+  boarder    User     @relation(fields: [boarderId], references: [id], onDelete: Cascade)
+  propertyId String
+  property   Property @relation(fields: [propertyId], references: [id], onDelete: Cascade)
+  createdAt  DateTime @default(now())
+
+  @@unique([boarderId, propertyId])
+  @@index([boarderId, createdAt])
+  @@index([propertyId])
+  @@map("favorites")
+}
+
+model Inquiry {
+  id         String        @id @default(cuid())
+  senderId   String
+  sender     User          @relation("InquirySender", fields: [senderId], references: [id], onDelete: Cascade)
+  ownerId    String
+  owner      User          @relation("InquiryOwner", fields: [ownerId], references: [id], onDelete: Cascade)
+  propertyId String
+  property   Property      @relation(fields: [propertyId], references: [id], onDelete: Cascade)
+  message    String
+  response   String?
+  status     InquiryStatus @default(PENDING)
+  createdAt  DateTime      @default(now())
+  updatedAt  DateTime      @updatedAt
+
+  @@index([senderId, createdAt])
+  @@index([ownerId, status])
+  @@index([propertyId])
+  @@map("inquiries")
+}
+
+model Review {
+  id         String       @id @default(cuid())
+  boarderId  String
+  boarder    User         @relation(fields: [boarderId], references: [id], onDelete: Cascade)
+  propertyId String
+  property   Property     @relation(fields: [propertyId], references: [id], onDelete: Cascade)
+  rating     Int
+  content    String
+  status     ReviewStatus @default(PENDING)
+  createdAt  DateTime     @default(now())
+  updatedAt  DateTime     @updatedAt
+
+  @@unique([boarderId, propertyId])
+  @@index([propertyId, status])
+  @@index([boarderId, createdAt])
+  @@map("reviews")
+}
+
+model Report {
+  id         String       @id @default(cuid())
+  boarderId  String
+  boarder    User         @relation(fields: [boarderId], references: [id], onDelete: Cascade)
+  propertyId String
+  property   Property     @relation(fields: [propertyId], references: [id], onDelete: Cascade)
+  reason     ReportReason
+  details    String?
+  status     ReportStatus @default(PENDING)
+  createdAt  DateTime     @default(now())
+  updatedAt  DateTime     @updatedAt
+
+  @@index([propertyId, status])
+  @@index([boarderId, createdAt])
+  @@map("reports")
+}
+
+model OwnerVerification {
+  id              String                  @id @default(cuid())
+  ownerId         String                  @unique
+  owner           User                    @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  legalName       String
+  phoneNumber     String
+  documentType    String
+  documentUrl     String
+  additionalInfo  String?
+  status          OwnerVerificationStatus @default(PENDING)
+  rejectionReason String?
+  submittedAt     DateTime                @default(now())
+  updatedAt       DateTime                @updatedAt
+
+  @@index([status, submittedAt])
+  @@map("owner_verifications")
+}

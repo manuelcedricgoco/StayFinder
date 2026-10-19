@@ -1,0 +1,22 @@
+@import "tailwindcss";
+
+/* Class-based dark mode: <html> gets .dark (set by ThemeProvider and the inline script in index.html). */
+@custom-variant dark (&:where(.dark, .dark *));
+
+:root {
+  color-scheme: light;
+}
+
+.dark {
+  color-scheme: dark;
+}
+
+html {
+  scroll-behavior: smooth;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html {
+    scroll-behavior: auto;
+  }
+}

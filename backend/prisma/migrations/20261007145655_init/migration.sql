@@ -1,0 +1,6 @@
+-- CreateTable
+CREATE TABLE "system_checks" (
+    "id" INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT,
+    "note" TEXT NOT NULL DEFAULT 'phase-1-setup',
+    "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
