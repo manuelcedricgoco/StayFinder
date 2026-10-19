@@ -195,6 +195,79 @@ describe('Phase 10 OAuth sign-in', () => {
     assert.equal(response.status, 400);
   });
 
+  it('never links an unverified Facebook email to an existing password account', async () => {
+    const existing = await prisma.user.create({
+      data: { name: 'Facebook Victim', email: 'facebook.victim@example.com', role: 'OWNER', passwordHash: 'test-hash' },
+    });
+    const userCountBefore = await prisma.user.count();
+    const accountCountBefore = await prisma.oAuthAccount.count();
+
+    providerProfile = {
+      id: 'facebook-id-victim',
+      name: 'Facebook Victim',
+      email: 'facebook.victim@example.com',
+      picture: { data: { url: 'https://example.com/facebook-avatar.jpg' } },
+    };
+    const flow = await start('facebook', 'BOARDER');
+    const callback = await finish('facebook', flow.state, flow.stateCookie);
+
+    assert.equal(callback.status, 302);
+    const callbackUrl = new URL(callback.headers.get('location')!);
+    assert.equal(callbackUrl.pathname, '/login');
+    assert.equal(callbackUrl.searchParams.get('oauthError'), 'account_exists');
+    assert.equal(
+      callback.headers.getSetCookie().some((cookie) => cookie.startsWith('stayfinder_session=')),
+      false,
+      'no session may be created when the email already belongs to a password account',
+    );
+
+    // Neither a second user nor a link may exist - the takeover was blocked.
+    assert.equal(await prisma.user.count(), userCountBefore);
+    assert.equal(await prisma.user.count({ where: { email: existing.email } }), 1);
+    assert.equal(await prisma.oAuthAccount.count(), accountCountBefore);
+    assert.equal(await prisma.oAuthAccount.count({ where: { providerAccountId: 'facebook-id-victim' } }), 0);
+  });
+
+  it('never links an OAuth identity to an ADMIN account', async () => {
+    const adminEmail = 'admin.takeover@example.com';
+    await prisma.user.create({
+      data: { name: 'Takeover Admin', email: adminEmail, role: 'ADMIN', passwordHash: 'test-hash' },
+    });
+    const userCountBefore = await prisma.user.count();
+    const accountCountBefore = await prisma.oAuthAccount.count();
+
+    providerProfile = {
+      id: 'facebook-id-admin',
+      name: 'Takeover Admin',
+      email: adminEmail,
+    };
+    const facebookFlow = await start('facebook', 'BOARDER');
+    const facebookCallback = await finish('facebook', facebookFlow.state, facebookFlow.stateCookie);
+    assert.equal(new URL(facebookCallback.headers.get('location')!).searchParams.get('oauthError'), 'account_exists');
+    assert.equal(
+      facebookCallback.headers.getSetCookie().some((cookie) => cookie.startsWith('stayfinder_session=')),
+      false,
+    );
+
+    providerProfile = {
+      sub: 'google-id-admin',
+      name: 'Takeover Admin',
+      email: adminEmail,
+      email_verified: true,
+    };
+    const googleFlow = await start('google', 'BOARDER');
+    const googleCallback = await finish('google', googleFlow.state, googleFlow.stateCookie);
+    assert.equal(new URL(googleCallback.headers.get('location')!).searchParams.get('oauthError'), 'account_exists');
+    assert.equal(
+      googleCallback.headers.getSetCookie().some((cookie) => cookie.startsWith('stayfinder_session=')),
+      false,
+    );
+
+    // Accounts row unchanged: no session, no linking, no new users.
+    assert.equal(await prisma.user.count(), userCountBefore);
+    assert.equal(await prisma.oAuthAccount.count(), accountCountBefore);
+  });
+
   it('rejects invalid state and unverified Google email without creating accounts', async () => {
     const beforeCount = await prisma.user.count();
     const invalidState = await request('/api/auth/oauth/google/callback?code=test-code&state=0000000000000000000000000000000000000000000000000000000000000000');

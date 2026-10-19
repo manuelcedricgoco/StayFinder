@@ -17,6 +17,12 @@ const PROVIDER_LABELS: Record<ProviderName, string> = { google: 'Google', facebo
 const STATE_COOKIE_PREFIX = 'stayfinder_oauth_state_';
 const STATE_TTL_MS = 10 * 60 * 1000;
 const CALLBACK_FAILURE = '/login?oauthError=failed';
+const CALLBACK_ACCOUNT_EXISTS = '/login?oauthError=account_exists';
+
+// Thrown when the provider identity matches an existing local account that
+// must not be linked automatically (unverified provider email, or an admin
+// account). Redirects to a page telling the visitor to log in with a password.
+class AccountLinkConflict extends Error {}
 
 function isProvider(value: string): value is ProviderName {
   return value === 'google' || value === 'facebook';
@@ -105,6 +111,9 @@ interface ProviderIdentity {
   name: string;
   email: string;
   avatarUrl: string | null;
+  // Only identities whose email the provider itself verified may be linked to
+  // an existing account. Facebook never verifies, so it stays false there.
+  emailVerified: boolean;
 }
 
 async function fetchJson(url: string, init?: RequestInit): Promise<Record<string, unknown>> {
@@ -147,6 +156,7 @@ async function exchangeCode(provider: ProviderName, code: string): Promise<Provi
       name: profile.name,
       email: profile.email.trim().toLowerCase(),
       avatarUrl: typeof profile.picture === 'string' && isHttpsUrl(profile.picture) ? profile.picture : null,
+      emailVerified: true,
     };
   }
 
@@ -177,6 +187,8 @@ async function exchangeCode(provider: ProviderName, code: string): Promise<Provi
     name: profile.name,
     email: profile.email.trim().toLowerCase(),
     avatarUrl: typeof picture === 'string' && isHttpsUrl(picture) ? picture : null,
+    // The Facebook Graph API does not attest that the email is verified.
+    emailVerified: false,
   };
 }
 
@@ -200,8 +212,12 @@ async function findOrCreateOAuthUser(
     where: { email: identity.email },
     select: { id: true, role: true },
   });
-  if (existingUser?.role === 'ADMIN') {
-    throw new Error('Administrator accounts cannot be linked through social sign-in.');
+  // An OAuth identity may only claim an existing account when its email was
+  // verified by the provider (Google) and the account is not an administrator.
+  // Facebook clients cannot verify, so a matching password account must never
+  // be linked; ask the visitor to log in with the password instead.
+  if (existingUser && (!identity.emailVerified || existingUser.role === 'ADMIN')) {
+    throw new AccountLinkConflict();
   }
   if (!existingUser && !(await getPlatformSettings()).allowRegistrations) {
     throw new Error('New account registration is currently disabled.');
@@ -329,6 +345,10 @@ oauthRouter.get('/:provider/callback', async (req, res) => {
     setSessionCookie(res, session.token, session.expiresAt);
     res.redirect(302, frontendRedirect('/auth/callback'));
   } catch (error) {
+    if (error instanceof AccountLinkConflict) {
+      res.redirect(302, frontendRedirect(CALLBACK_ACCOUNT_EXISTS));
+      return;
+    }
     console.error(`${PROVIDER_LABELS[provider]} OAuth callback failed (${error instanceof Error ? error.name : 'unknown error'}).`);
     res.redirect(302, frontendRedirect(CALLBACK_FAILURE));
   }

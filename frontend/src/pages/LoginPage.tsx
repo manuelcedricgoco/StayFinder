@@ -66,6 +66,11 @@ export function LoginPage() {
             }
           >
             <form onSubmit={handleSubmit} noValidate className="space-y-4">
+              {searchParams.get('oauthError') === 'account_exists' && (
+                <p role="alert" className="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700">
+                  An account with this email already exists. Log in with your password.
+                </p>
+              )}
               {searchParams.get('oauthError') === 'failed' && (
                 <p role="alert" className="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700">
                   Social sign-in could not be completed. Please try again or use your email and password.
