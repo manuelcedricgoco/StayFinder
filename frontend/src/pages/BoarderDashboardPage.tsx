@@ -1,5 +1,5 @@
 import { Link } from 'react-router-dom';
-import { Flag, Heart, Mail, Star, Building2, Bell } from 'lucide-react';
+import { Flag, Heart, Mail, Star, Bell } from 'lucide-react';
 import { useAuth } from '../hooks/useAuth';
 
 const mockActivity = [

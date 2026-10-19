@@ -76,7 +76,6 @@ interface SecurityResponse {
 
 const cardStyles = 'rounded-2xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 p-4 shadow-sm sm:p-5';
 const inputStyles = 'w-full rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-900 px-3 py-2.5 text-sm text-slate-700 dark:text-slate-200 outline-none focus:border-emerald-600 focus:ring-2 focus:ring-emerald-100';
-const dateInputStyles = 'mt-1 w-full rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-900 px-3 py-2.5 text-sm text-slate-700 dark:text-slate-200 outline-none focus:border-emerald-600 focus:ring-2 focus:ring-emerald-100';
 
 function formatDate(value: string) {
   return new Date(value).toLocaleString('en-PH', {

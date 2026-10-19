@@ -1,4 +1,4 @@
-import { createBrowserRouter, Navigate } from 'react-router-dom';
+import { createBrowserRouter } from 'react-router-dom';
 import { GuestRoute, ProtectedRoute } from './components/auth/RouteGuards';
 import { Layout } from './components/layout/Layout';
 import { PanelLayout } from './components/layout/PanelLayout';
@@ -27,7 +27,6 @@ import { NotFoundPage } from './pages/NotFoundPage';
 import { OAuthCallbackPage } from './pages/OAuthCallbackPage';
 import { OwnerDashboardPage } from './pages/OwnerDashboardPage';
 import { OwnerInquiriesPage } from './pages/OwnerInquiriesPage';
-import { OwnerProfilePage } from './pages/OwnerProfilePage';
 import { OwnerPaymentsPage } from './pages/OwnerPaymentsPage';
 import { OwnerReviewsPage } from './pages/OwnerReviewsPage';
 import { OwnerRoomsPage } from './pages/OwnerRoomsPage';

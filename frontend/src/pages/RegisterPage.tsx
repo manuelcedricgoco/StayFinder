@@ -1,4 +1,4 @@
-import { useState, type FormEvent } from 'react';
+import { useState, type FormEvent, type ReactElement } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { User, Mail, Lock, Eye, EyeOff, UserCircle, Home } from 'lucide-react';
 import { AuthCard } from '../components/auth/AuthCard';
@@ -11,7 +11,7 @@ import type { PublicPlatformSettings } from '../lib/platformSettings';
 import { ROLE_HOME } from '../lib/roles';
 import type { RegisterInput } from '../types/auth';
 
-const ACCOUNT_TYPES: { value: RegisterInput['role']; title: string; description: string; icon: JSX.Element }[] = [
+const ACCOUNT_TYPES: { value: RegisterInput['role']; title: string; description: string; icon: ReactElement }[] = [
   { value: 'BOARDER', title: 'I need a place', description: 'Property seeker', icon: <UserCircle size={20} /> },
   { value: 'OWNER', title: 'I own a property', description: 'Property owner', icon: <Home size={20} /> },
 ];

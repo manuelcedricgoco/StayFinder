@@ -34,6 +34,10 @@ const roleStyles: Record<AccountRole, string> = {
   BOARDER: 'bg-sky-100 text-sky-800 dark:bg-sky-900 dark:text-sky-300',
 };
 
+function isAccountRole(value: string): value is AccountRole {
+  return value === 'ADMIN' || value === 'OWNER' || value === 'BOARDER';
+}
+
 export function AdminUsersPage() {
   const [search, setSearch] = useState('');
   const [role, setRole] = useState<AccountRole | ''>('');
@@ -79,9 +83,11 @@ export function AdminUsersPage() {
             ]}
             selected={role}
             onSelect={(newRole) => {
-              setRole(newRole);
-              setPage(1);
-            }} 
+              if (newRole === '' || isAccountRole(newRole)) {
+                setRole(newRole);
+                setPage(1);
+              }
+            }}
           />
         </label>
       </div>

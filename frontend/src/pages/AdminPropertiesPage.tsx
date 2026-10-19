@@ -1,11 +1,10 @@
 import { useState } from 'react';
 import { BackLink } from '../components/ui/BackLink';
-import { StatusFilter } from '../components/ui/StatusFilter';
 import { useApiResource } from '../hooks/useApiResource';
 import { ApiError, apiRequest } from '../lib/api';
 import { FilterDropdown } from '../components/ui/FilterDropdown';
 import { ConfirmationModal } from '../components/ui/ConfirmationModal';
-import { formatPeso, TYPE_LABEL, STATUS_LABEL } from '../lib/listings';
+import { formatPeso, TYPE_LABEL } from '../lib/listings';
 import { ListingStatus } from '../types/listing';
 
 interface AdminProperty {
@@ -35,7 +34,6 @@ export function AdminPropertiesPage() {
   const [savingId, setSavingId] = useState<string | null>(null);
   const [selectedProperty, setSelectedProperty] = useState<AdminProperty | null>(null);
   const [activeModal, setActiveModal] = useState<'APPROVE' | 'REJECT' | 'DEACTIVATE' | null>(null);
-  const [rejectionReason, setRejectionReason] = useState('');
 
   async function updateStatus(property: AdminProperty, status: 'APPROVED' | 'REJECTED' | 'INACTIVE', reason?: string) {
     setError('');
@@ -47,7 +45,6 @@ export function AdminPropertiesPage() {
       });
       reload();
       setActiveModal(null);
-      setRejectionReason('');
     } catch (cause) {
       setError(cause instanceof ApiError ? cause.message : 'Could not update the listing.');
     } finally {
