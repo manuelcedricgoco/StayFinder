@@ -24,6 +24,14 @@ function positiveNumber(name: string, fallback: number): number {
   return Number.isFinite(value) && value > 0 ? value : fallback;
 }
 
+// Accepts "true" (trust all proxies), a hop count, or comma-separated proxied addresses.
+function trustProxyEnv(name: string): boolean | string | undefined {
+  const value = optionalEnv(name);
+  if (value === undefined) return undefined;
+  if (value.toLowerCase() === 'true') return true;
+  return value;
+}
+
 const nodeEnv = process.env.NODE_ENV ?? 'development';
 
 export const env = {
@@ -34,7 +42,23 @@ export const env = {
   // Prisma reads DATABASE_URL by itself; we check it here to fail early with a clear message.
   databaseUrl: requireEnv('DATABASE_URL'),
   sessionTtlDays: positiveNumber('SESSION_TTL_DAYS', 7),
+  // undefined keeps Express's default (proxy headers like X-Forwarded-For are ignored).
+  trustProxy: trustProxyEnv('TRUST_PROXY'),
 };
+
+// Fail fast on unsafe production settings.
+if (env.isProduction) {
+  if (!env.frontendUrl.startsWith('https://')) {
+    throw new Error(
+      'FRONTEND_URL must start with "https://" when NODE_ENV is "production".',
+    );
+  }
+  if (process.env.ADMIN_PASSWORD === 'Admin12345') {
+    throw new Error(
+      'ADMIN_PASSWORD is still the known default "Admin12345" - set a strong, unique password before running in production.',
+    );
+  }
+}
 
 // Optional OAuth credentials. Providers remain unavailable until all provider settings are valid.
 export const oauthConfig = {

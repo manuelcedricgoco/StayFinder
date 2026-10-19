@@ -16,6 +16,7 @@ build/
 *.db-journal
 *.sqlite
 *.sqlite3
+uploads/
 backend/uploads/
 
 # Logs
