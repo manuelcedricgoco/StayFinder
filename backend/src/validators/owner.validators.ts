@@ -15,6 +15,10 @@ export const ownerInquiryReplySchema = z.object({
   message: 'Provide a response or an inquiry status.',
 });
 
+// Avatars may only point at images stored by the avatar upload endpoint
+// (see lib/avatarStorage) - never at arbitrary external URLs.
+const STORED_AVATAR_PATTERN = /^\/api\/uploads\/avatars\/[a-f0-9-]+\.(jpg|png|webp)$/;
+
 export const ownerProfileSchema = z.object({
   name: z.string().trim().min(2).max(80),
   phoneNumber: z.union([
@@ -23,9 +27,9 @@ export const ownerProfileSchema = z.object({
     z.null(),
   ]).optional(),
   avatarUrl: z.union([
-    z.string().trim().max(2048).refine(
-      (value) => value.startsWith('https://') || /^\/api\/uploads\/avatars\/[a-f0-9-]+\.(jpg|png|webp)$/.test(value),
-      'Avatar must be an HTTPS URL or a stored profile image.',
+    z.string().trim().refine(
+      (value) => STORED_AVATAR_PATTERN.test(value),
+      'Avatar must be a stored profile image.',
     ),
     z.null(),
   ]),

@@ -33,14 +33,6 @@ function isConfigured(provider: ProviderName): boolean {
   return Boolean(clientId && clientSecret && callbackUrl && isAllowedCallbackUrl(callbackUrl));
 }
 
-function isHttpsUrl(value: string): boolean {
-  try {
-    return new URL(value).protocol === 'https:';
-  } catch {
-    return false;
-  }
-}
-
 function isAllowedCallbackUrl(value: string): boolean {
   try {
     const url = new URL(value);
@@ -110,7 +102,6 @@ interface ProviderIdentity {
   id: string;
   name: string;
   email: string;
-  avatarUrl: string | null;
   // Only identities whose email the provider itself verified may be linked to
   // an existing account. Facebook never verifies, so it stays false there.
   emailVerified: boolean;
@@ -155,7 +146,6 @@ async function exchangeCode(provider: ProviderName, code: string): Promise<Provi
       id: profile.sub,
       name: profile.name,
       email: profile.email.trim().toLowerCase(),
-      avatarUrl: typeof profile.picture === 'string' && isHttpsUrl(profile.picture) ? profile.picture : null,
       emailVerified: true,
     };
   }
@@ -176,9 +166,6 @@ async function exchangeCode(provider: ProviderName, code: string): Promise<Provi
     access_token: token.access_token,
   }).toString();
   const profile = await fetchJson(profileUrl.toString());
-  const picture = profile.picture && typeof profile.picture === 'object'
-    ? (profile.picture as { data?: { url?: unknown } }).data?.url
-    : undefined;
   if (typeof profile.id !== 'string' || typeof profile.email !== 'string' || typeof profile.name !== 'string') {
     throw new Error('Facebook profile is missing an email or required identity fields.');
   }
@@ -186,7 +173,6 @@ async function exchangeCode(provider: ProviderName, code: string): Promise<Provi
     id: profile.id,
     name: profile.name,
     email: profile.email.trim().toLowerCase(),
-    avatarUrl: typeof picture === 'string' && isHttpsUrl(picture) ? picture : null,
     // The Facebook Graph API does not attest that the email is verified.
     emailVerified: false,
   };
@@ -232,7 +218,9 @@ async function findOrCreateOAuthUser(
               name: identity.name,
               email: identity.email,
               role,
-              avatarUrl: identity.avatarUrl,
+              // Provider avatar URLs are not trusted; users can upload an
+              // avatar themselves after signing in.
+              avatarUrl: null,
             },
             select: publicUserSelect,
           });

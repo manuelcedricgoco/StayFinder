@@ -13,7 +13,13 @@ import {
 } from '@prisma/client';
 import { hashPassword } from '../src/lib/password';
 
-const DEMO_PASSWORD = 'StayFinderDemo123';
+// Demo credentials are fake and publicly known - never touch a production
+// database with them.
+if (process.env.NODE_ENV === 'production') {
+  throw new Error('Refusing to seed demo data while NODE_ENV is "production".');
+}
+
+const DEMO_PASSWORD = process.env.DEMO_PASSWORD || 'StayFinderDemo123';
 
 const users = [
   { id: 'demo-owner-maria', name: 'Maria Santos', email: 'maria.owner@stayfinder.test', role: Role.OWNER },

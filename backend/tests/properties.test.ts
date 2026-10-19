@@ -725,9 +725,16 @@ describe('Phase 4 property management', () => {
         (item: { id: string }) => item.id === review.data!.review.id,
       ));
 
-      const profile = await ownerA.request('PATCH', '/api/owner/profile', {
+      // Arbitrary external avatar URLs are rejected; only stored paths or null pass.
+      const externalAvatar = await ownerA.request('PATCH', '/api/owner/profile', {
         name: 'Olivia Updated',
         avatarUrl: 'https://example.com/avatar.jpg',
+      });
+      assert.equal(externalAvatar.status, 400);
+
+      const profile = await ownerA.request('PATCH', '/api/owner/profile', {
+        name: 'Olivia Updated',
+        avatarUrl: null,
       });
       assert.equal(profile.status, 200);
       assert.equal(profile.data!.user.name, 'Olivia Updated');

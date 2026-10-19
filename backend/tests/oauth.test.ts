@@ -134,7 +134,8 @@ describe('Phase 10 OAuth sign-in', () => {
     assert.equal(user.name, 'Google Owner');
     assert.equal(user.email, 'google.owner@example.com');
     assert.equal(user.role, 'OWNER');
-    assert.equal(user.avatarUrl, 'https://example.com/google-avatar.jpg');
+    // Provider-supplied avatar URLs are never stored.
+    assert.equal(user.avatarUrl, null);
     assert.equal(await prisma.oAuthAccount.count({ where: { provider: 'google', providerAccountId: 'google-sub-001' } }), 1);
     assert.equal(await prisma.user.count({ where: { email: user.email } }), 1);
 
@@ -165,7 +166,8 @@ describe('Phase 10 OAuth sign-in', () => {
     const user = (await response.json() as { user: { role: string; email: string; avatarUrl: string | null } }).user;
     assert.equal(user.role, 'BOARDER');
     assert.equal(user.email, 'boarder.facebook@example.com');
-    assert.equal(user.avatarUrl, 'https://example.com/facebook-avatar.jpg');
+    // The Facebook picture URL is ignored as well.
+    assert.equal(user.avatarUrl, null);
   });
 
   it('links a provider-verified email to an existing non-admin account', async () => {
